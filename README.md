@@ -1,6 +1,6 @@
-# Inject LE simulation on DP1 images
+# Inject LE simulation on DP1[1] images
 
-using the `lsst_stack = v29.1.1` on NERSC.
+using the LSST Sciennce Pipeline[2] version `lsst_stack = v29.1.1` on NERSC.
 
 ## How to create the DP1 images?
 * `create_coadds/dp1_extract_visits.ipynb`: 
@@ -61,5 +61,9 @@ The scripts do the injection of the simulated LE into DP1 coadds, do source dete
 
 **CASE D: Two LEs are observed at two different epochs**
 
+
+
+[1] NSF-DOE Vera C. Rubin Observatory (2025); Legacy Survey of Space and Time Data Preview 1, https://doi.org/10.71929/rubin/2570308
+[2] Rubin Observatory Science Pipelines Developers (2025); The LSST Science Pipelines Software: Optical Survey Pipeline Reduction and Analysis Environment, https://doi.org/10.71929/rubin/2570545
 
 
