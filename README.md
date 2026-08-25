@@ -78,6 +78,8 @@ output-folder
 │	└── c_injections_double_onesys_save_runs.csv
 ```
 
+![caseAandC](scripts/figures/case_a_case_c_fig.svg)
+
 **CASE B: Two LEs are observed at the first epoch; that is the same for both**
 
 **CASE D: Two LEs are observed at two different epochs**
