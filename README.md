@@ -47,17 +47,38 @@ The scripts do the injection of the simulated LE into DP1 coadds, do source dete
 
 **CASE A: LE is only observed on the first epoch**
 
-`python scripts/inject_diff_save_dp1_case_a.py`: This is still very manual. 
-* You need to define where are the coadds located
-* Take care of the output folders
+`python inject_diff_save_dp1_case_a.py -path_to_manifest <output-folder>/manifest.yml` 
+* You need to define where the coadds are located
+
+The injections will be saved as:
+
+```
+output-folder
+├── injections
+│   ├── asingle
+│   │   ├── images
+│   │   ├── numpy
+│	└── a_injections_single_save_runs.csv
+```
 
 **CASE C: LE is observed at two different epochs, and the difference has the characteristic *black and white* for the observed LE**
 
-`python scripts/inject_diff_save_dp1_case_b.py`: This is still very manual. 
-* You need to define where are the coadds located
-* Take care of the output folders
+`python inject_diff_save_dp1_case_c.py -path_to_manifest <output-folder>/manifest.yml` 
+* You need to define where the coadds are located
 
-**CASE B: Two LEs are observed at the first epoch, that is the same for both**
+The injections will be saved as:
+
+```
+output-folder
+├── injections
+	├── asingle
+│   ├── cdouble
+│   │   ├── images
+│   │   ├── numpy
+│	└── c_injections_double_onesys_save_runs.csv
+```
+
+**CASE B: Two LEs are observed at the first epoch; that is the same for both**
 
 **CASE D: Two LEs are observed at two different epochs**
 
