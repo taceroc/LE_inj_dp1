@@ -30,6 +30,24 @@ from lsst.meas.deblender import SourceDeblendTask, SourceDeblendConfig
 from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
 from lsst.meas.base import ForcedMeasurementTask
 from lsst.source.injection import CoaddInjectConfig, CoaddInjectTask
+
+
+import astropy.visualization as aviz
+import matplotlib
+# matplotlib.use("AGG")
+# Force matplotlib defaults
+matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import io
+import argparse
+def parse_args():
+    p = argparse.ArgumentParser("a_inj_single")
+    p.add_argument("-path_to_manifest", required=True)          # multi-run YAML
+    p.add_argument("-outdir", required=False)                      # output root
+    return p.parse_args()
+args = parse_args()
+    
 # ----- Load collection the coadds
 
 # load butler
@@ -91,8 +109,9 @@ def generate_injection(butler, deep_coadd_ref, which_fits, return_catalog=True):
         Ns = int((ns*ns) - 10)
         print(Ns)
         if Ns > 20:
-            Ns = 20
-            size_scale = False
+            Ns = 10
+            # size_scale = False
+            size_scale = imsize/(ns*wcs_b.getPixelScale().asDegrees())
         elif Ns <= 0:
             Ns = 5
             ns = np.sqrt((Ns+10))
@@ -107,9 +126,12 @@ def generate_injection(butler, deep_coadd_ref, which_fits, return_catalog=True):
             hdul.close()
 
             print(scaled_data.shape, size_scale, scale_factor)
+        else:
+            size_scale = imsize/(ns*wcs_b.getPixelScale().asDegrees())
         print("mean surface", np.mean(mags_plot[new_fits>0]))
 
-        if size_scale!=False:
+   
+        if Ns <= 5:
             mag = [np.mean(mags_plot[new_fits>0]) if np.mean(mags_plot[new_fits>0])<=18 else 18]
         else:
             mag = [np.mean(mags_plot[new_fits>0]) if np.mean(mags_plot[new_fits>0])<=22 else 22]
@@ -130,7 +152,7 @@ def generate_injection(butler, deep_coadd_ref, which_fits, return_catalog=True):
         if mag_source <= 18:
             mag_source = np.mean(mags_plot[new_fits>0])
     
-        return my_injection_catalog_LEs, coadd, wcs_b, radec, inject_size, Ns, mag_source, size_scale
+        return my_injection_catalog_LEs, coadd, wcs_b, radec, inject_size, Ns, mag_source, size_scale, imsize
     else:
         return coadd
 
@@ -220,14 +242,6 @@ def image_subtraction(injected_coadd_1st, injected_coadd_2nd, sources):
     result = alTask.run(injected_coadd_1st, injected_coadd_2nd, sources)
     return result
 
-import astropy.visualization as aviz
-import matplotlib
-# matplotlib.use("AGG")
-# Force matplotlib defaults
-matplotlib.rcParams.update(matplotlib.rcParamsDefault)
-import matplotlib.pyplot as plt
-from matplotlib import cm
-import io
 
 def plot_one_image(ax, data, size, scale, name=None):
     """Plot a normalized image on an axis."""
@@ -260,10 +274,8 @@ def plot_one_image(ax, data, size, scale, name=None):
     return im
 
 
-list_fits = sorted(glob.glob(f"runs/runs_082126/*/fits/*.fits"))
-manifest_path = sorted(glob.glob(f"runs/runs_082126/*.yml"))
-days_run = sorted([int(x.split('/')[1].split('_')[1]) for x in manifest_path])
-select_day_ran = [x for x in list_fits if str(days_run[-1]) in x] # only take the last simulation you ran
+path_to_manifest = args.path_to_manifest #'runs/runs_082126/manifest.yml'
+general_path = '/'.join(path_to_manifest.split('/')[0:-1])
 params =[
     'so_d_ly',
     'dz0_ly',
@@ -289,9 +301,8 @@ def create(manifest_path_ix):
 
     return df
 df_all = pd.DataFrame()
-for mm in manifest_path:
-    df = create(mm)
-    df_all = pd.concat([df_all, df])
+df = create(path_to_manifest)
+df_all = pd.concat([df_all, df])
 
 df_all = df_all.sort_values(by=['ct_years'])
 
@@ -305,15 +316,22 @@ df_to_use_to_plot_single_double_save = df_all.groupby(['so_d_ly',  'a', 'ay',
 
 df_to_use_to_plot_single_double_save['name_npy'] = ''
 
-os.makedirs(f'runs/runs_{str(days_run[-1])}/asingle/numpy', exist_ok=True)
-os.makedirs(f'runs/runs_{str(days_run[-1])}/asingle/images', exist_ok=True)
+if args.outdir:
+    general_path = args.outdir
 
-for ix, row in df_to_use_to_plot_single_double_save.iloc[0:2].iterrows():
+
+numpy_path = os.path.join(general_path, 'injections/asingle/numpy')
+images_path = os.path.join(general_path, 'injections/asingle/images')
+
+os.makedirs(numpy_path, exist_ok=True)
+os.makedirs(images_path, exist_ok=True)
+
+for ix, row in df_to_use_to_plot_single_double_save.iloc[:4].iterrows():
 
     print(row['outputs'], row['outputs'])
     my_injection_catalog_LEs = []
     which_fits = row['outputs'].replace('arrays', 'fits').replace('surface.npy', 'surface_image.fits')
-    my_injection_catalog_LEsix, coadd, wcs_b, radec, inject_size, Ns, mag_source, size_scale = generate_injection(butler_2nd, deep_coadd_ref_2nd, which_fits)
+    my_injection_catalog_LEsix, coadd, wcs_b, radec, inject_size, Ns, mag_source, size_scale, imsize = generate_injection(butler_2nd, deep_coadd_ref_2nd, which_fits)
     df_to_use_to_plot_single_double_save.at[ix, 'scaled'] = size_scale
     my_injection_catalog_LEs.append(my_injection_catalog_LEsix)
 
@@ -327,15 +345,21 @@ for ix, row in df_to_use_to_plot_single_double_save.iloc[0:2].iterrows():
     df_to_use_to_plot_single_double_save.loc[ix, 'coadd_name'] = path_name_ids
     path_name = '_'.join(which_fits.replace('/fits/surface_image.fits', '').split('/'))
     
-    path_to_numpy = f'runs/runs_{str(days_run[-1])}/asingle/numpy/{path_name}' 
-    path_to_images = f'runs/runs_{str(days_run[-1])}/asingle/images/{path_name}' 
+    ppath_to_numpy = os.path.join(numpy_path, path_name)
+    path_to_images = os.path.join(images_path, path_name)
     
     numpy_cutouts = {}
     name_npy_paths = []
     for iyy, row in enumerate(my_injection_catalog_LEs[-1]):
         try:
             center = wcs_b.skyToPixel(geom.SpherePoint(row['ra']*geom.degrees, row['dec']*geom.degrees))
-            s = int(size_scale) if size_scale != False else 300 #300
+            if int(size_scale)>=600:
+                float_value = int(size_scale)/2
+                new_x = center.x + float_value
+                new_y = center.y #+ float_value
+                center = geom.Point2D(new_x, new_y)
+            s = 600
+            # s = int(size_scale) if size_scale != False else 300 #300
             extent = geom.Extent2I(s, s)
             science_cutout = subtraction_outputs.matchedScience.getCutout(center, extent)
             template_cutout = injected_coadd_1st.getCutout(center, extent)
@@ -354,13 +378,14 @@ for ix, row in df_to_use_to_plot_single_double_save.iloc[0:2].iterrows():
             
             # output = io.BytesIO()
             # plt.show()
-            outfile_img = f'{path_to_images}_{dia_source_id}_{s}.png'
+            
+            outfile_img = os.path.join(images_path, f"{path_name}_{dia_source_id}_{s}.png")
             plt.savefig(outfile_img, bbox_inches="tight", format="png")
             # output.seek(0)
             plt.close(fig)
             
             for cutout_type, cutout in numpy_cutouts.items():
-                outfile = f'{path_to_numpy}_{dia_source_id}_{cutout_type}_{s}.npy'
+                outfile = os.path.join(numpy_path, f'{path_name}_{dia_source_id}_{cutout_type}_{s}.npy')
                 name_npy_paths.append(outfile)
                 np.save(outfile, np.expand_dims(cutout, axis=0))
     
@@ -373,8 +398,15 @@ for ix, row in df_to_use_to_plot_single_double_save.iloc[0:2].iterrows():
             continue
     
     df_to_use_to_plot_single_double_save.at[ix, 'name_npy'] = name_npy_paths
-df_to_use_to_plot_single_double_save.to_csv(f'a_df_to_use_to_plot_single_save_runs_{str(days_run[-1])}.csv', index=False)
 
+
+path_save_csv = os.path.join(general_path, 'injections/asingle')
+if os.path.exists(os.path.join(path_save_csv, 'a_injections_single_save_runs.csv')):
+    import random
+    random_seed = random.getrandbits(16)
+    df_to_use_to_plot_single_double_save.to_csv(os.path.join(path_save_csv, f'a_injections_single_save_runs_{random_seed}.csv'), index=False)
+else:
+    df_to_use_to_plot_single_double_save.to_csv(os.path.join(path_save_csv, 'a_injections_single_save_runs.csv'), index=False)
 
     
     
